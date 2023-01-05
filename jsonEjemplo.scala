@@ -18,29 +18,27 @@ object jsonEjemplo {
       "director":"name_director",
       "frs_actor":"name_actor1",
       "sec_actor":"name_actor2"
-
     }
   }
-
 }
-"""
+""".replace("\r", "")
 
   def printJson = {
 
-    implicit val rltRds = (
+    implicit val moviesReads = (
       (__ \ "director").read[String] ~
         (__ \ "frs_actor").read[String] ~
         (__ \ "sec_actor").read[String]
-      ) //(Retailer)
+      ) //(movie)
 
 
-    implicit val bsnsRds = ({
-      val business = (__ \ "movies")
-      (business \ "name").read[String] ~
-        (business \ "original_title").read[String] ~
-        (business \"genres").read[String]~
-        (business \ "relaseDate").read[String]
-
+    implicit val castReads = ({
+      val movies = (__ \ "movies")
+      (movies \ "name").read[String] ~
+        (movies \ "original_title").read[String] ~
+        (movies \"genres").read[String]~
+        (movies \ "relaseDate").read[String]~
+        (movies \ "cast").read[String]
     })
 
 
