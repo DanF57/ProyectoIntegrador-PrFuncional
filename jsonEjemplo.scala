@@ -7,18 +7,18 @@ object jsonEjemplo {
   val jsonValue =
     """
 {
-  "business":
+  "movies":
   {
-    "name":"Some Business Name",
-    "preferredUrl":"someurl",
-    "businessPhone":"somenumber",
-    "retailer":
+    "name":"Original Name",
+    "original_title":"title",
+    "genres":"type_gen",
+    "relaseDate":"date",
+    "cast":
     {
-      "firstName":"Some",
-      "lastName":"One",
-      "email":"someone@somewhere.com",
-      "mobileNo":"someothernumber",
-      "password":"$^^HFKH*"
+      "director":"name_director",
+      "frs_actor":"name_actor1",
+      "sec_actor":"name_actor2"
+
     }
   }
 
@@ -28,27 +28,25 @@ object jsonEjemplo {
   def printJson = {
 
     implicit val rltRds = (
-      (__ \ "firstName").read[String] ~
-        (__ \ "lastName").read[String] ~
-        (__ \ "email").read[String] ~
-        (__ \ "mobileNo").read[String] ~
-        (__ \ "password").read[String]
+      (__ \ "director").read[String] ~
+        (__ \ "frs_actor").read[String] ~
+        (__ \ "sec_actor").read[String]
       ) //(Retailer)
 
 
     implicit val bsnsRds = ({
-      val business = (__ \ "business")
+      val business = (__ \ "movies")
       (business \ "name").read[String] ~
-        (business \ "preferredUrl").read[String] ~
-        (business \ "businessPhone").read[String]
-      //  (business \ "retailer").read[Retailer](rltRds)
-    }) //(Business)
+        (business \ "original_title").read[String] ~
+        (business \"genres").read[String]~
+        (business \ "relaseDate").read[String]
+
+    })
 
 
-    val buisness = Json.parse(jsonValue) //.validate[Business](bsnsRds)
-    //val json = Json.toJson(bus)
+    val movies = Json.parse(jsonValue)
 
-    println(buisness)
+    println(movies)
   }
 
 
