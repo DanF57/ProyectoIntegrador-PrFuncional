@@ -2,7 +2,7 @@ import com.github.tototoshi.csv._
 import java.io.File
 
 object DatosNumericos extends App{
-  val reader = CSVReader.open(new File("C:\\Users\\SALA A\\Downloads\\ejemplo\\src\\main/movie_dataset.csv"))
+  val reader = CSVReader.open(new File("C:\\Users\\Daniel\\Downloads/movie_dataset.csv"))
   val data: List[Map[String, String]] = reader.allWithHeaders()
   reader.close()
 
