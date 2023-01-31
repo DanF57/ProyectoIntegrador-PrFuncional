@@ -13,6 +13,8 @@ import java.nio.file.{Files, Paths, StandardOpenOption}
 import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
+import requests._
+
 object MainProyect extends App {
 
   //Conexión Base de Datos
@@ -25,6 +27,7 @@ object MainProyect extends App {
   reader.close()
 
   /*
+  //Entidades
   case class Movies(id: Int,
                     index_movie: Int,
                     budget: Long,
@@ -150,8 +153,6 @@ object MainProyect extends App {
       .update
       .apply())
 
-
-
   case class Crew(crew_name: String,
                   gender: Int,
                   department: String,
@@ -214,7 +215,161 @@ object MainProyect extends App {
        """.stripMargin
       .update
       .apply())
+
+
+  val casData = data
+    .map((row) => row("cast"))
+    .filter(_.nonEmpty)
+    .map(StringContext.processEscapes)
+    .map(names)
+    .map(json => Try(Json.parse(json.get)))
+    .filter(_.isSuccess)
+    .map(_.get)
+    .flatMap(json => json("entity_list").as[JsArray].value)
+    .map(_("form"))
+    .map(data => data.as[String])
+    .distinct
+    .toSet
+
+  val cast = casData.map(x =>
+    sql"""
+         INSERT INTO `cast`(actor_name)
+         VALUES
+         (${x})
+         """.stripMargin
+      .update
+      .apply())
+
+  //Relaciones
+  val movieCompanies = data
+    .map(row => (row("id"), Json.parse(row("production_companies"))))
+    .map(row => (row._1, (row._2 \\ "id").toList))
+    .flatMap(x => x._2.map((x._1, _)))
+    .map(x => (x._1.toInt, x._2.toString().toInt))
+
+  val cast = movieCompanies.map(x =>
+    sql"""
+           INSERT INTO movies_companies(id, comp_id)
+           VALUES
+           (${x._1}, ${x._2})
+           """.stripMargin
+      .update
+      .apply())
+
+
+  val movieCompanies = data
+    .map(row => (row("id"), Json.parse(row("production_countries"))))
+    .map(row => (row._1, (row._2 \\ "iso_3166_1").toList))
+    .flatMap(x => x._2.map((x._1, _)))
+    .map(x => (x._1.toInt, escapeMysql2(x._2.toString)))
+
+  val cast = movieCompanies.map(x =>
+    sql"""
+             INSERT INTO movies_countries(id, prod_iso_cod)
+             VALUES
+             (${x._1}, ${x._2})
+             """.stripMargin
+      .update
+      .apply())
+
+  val movieLanguages = data
+    .map(row => (row("id"), Json.parse(row("spoken_languages"))))
+    .map(row => (row._1, (row._2 \\ "iso_639_1").toList))
+    .flatMap(x => x._2.map((x._1, _)))
+    .map(x => (x._1.toInt, escapeMysql2(x._2.toString)))
+
+  val cast = movieLanguages.map(x =>
+    sql"""
+               INSERT INTO movies_languages(id, lang_iso_cod)
+               VALUES
+               (${x._1}, ${x._2})
+               """.stripMargin
+      .update
+      .apply())
+
+
+  val movieStatus = data
+    .map(row => (row("id"), row("status")))
+
+  val cast = movieStatus.map(x =>
+    sql"""
+    INSERT INTO movies_status(id, status_name)
+    VALUES
+    (${x._1}, ${x._2})
+    """.stripMargin
+      .update
+      .apply())
+
+  val movieCrew = data
+    .map(row => (row("id"), (row("crew"))))
+    .map(x => (x._1, replacePattern(x._2)))
+    .map(x => (x._1, x._2.replace("'", "\"")))
+    .map(x => (x._1, x._2.replace("-u0027", "'")))
+    .map(x => (x._1, x._2.replace("-u0022", "\\\"")))
+    .map(x => (x._1, StringContext.processEscapes(x._2)))
+    .map(x => (x._1, Try(Json.parse(x._2))))
+    .filter(_._2.isSuccess)
+    .map(x => (x._1, x._2.get))
+    .map(row => (row._1, (row._2 \\ "credit_id").toList))
+    .flatMap(x => x._2.map((x._1, _)))
+    .map(x => (x._1.toInt, (escapeMysql2(x._2.toString))))
+
+  val crews = movieCrew.map(x =>
+    sql"""
+      INSERT INTO movies_crew(id, credit_id)
+      VALUES
+      (${x._1}, ${x._2})
+      """.stripMargin
+      .update
+      .apply())
+
+
+  val movieGenres = data
+    .map(row => (row("id"), row("genres")))
+    .map(x => (x._1, x._2.replace("Science Fiction", "Science-Fiction")))
+    .filter(_._2.nonEmpty)
+    .map(x => (x._1, x._2.split(" ").toList))
+    .map(x => x._2.map((x._1, _)))
+
+  val genresInsert = movieGenres.map(_.map(x =>
+    sql"""
+       INSERT INTO movies_genres(id, genre_name)
+       VALUES
+       (${x._1}, ${x._2})
+       """.stripMargin
+      .update
+      .apply()))
+
    */
+
+  val casData = data
+    .map(row => (row("id"), row("cast")))
+    .filter(_._2.nonEmpty)
+    .map(x => (x._1, StringContext.processEscapes(x._2)))
+    .take(10) //Reestriccion
+    .map(x => (x._1, names(x._2)))
+    .map(x => (x._1, Try(Json.parse(x._2.get))))
+    .filter(_._2.isSuccess)
+    .map(x => (x._1, x._2.get))
+    .map(x => (x._1, x._2("entity_list").as[JsArray].value))
+    .map(x => (x._1, x._2.map(_("form"))))
+    .map(x => (x._1.toInt, x._2.map(_.toString()).toList))
+    .map(x => x._2.map((x._1, _)))
+
+
+  val moviesCastInsert = casData.map(_.map(x =>
+    sql"""
+       INSERT INTO movies_cast(id, actor_name)
+       VALUES
+       (${x._1}, ${escapeMysql2(x._2)})
+       """.stripMargin
+      .update
+      .apply()))
+
+
+  def escapeMysql2(text: String): String = text
+    .replaceAll("'", "")
+    .replaceAll("\"", "")
 
   def escapeMysql(text: String): String = text
     .replaceAll("\\\\", "\\\\\\\\")
@@ -251,6 +406,21 @@ object MainProyect extends App {
       txtOr = txtOr.replace(textOriginal, replacementText)
     }
     txtOr
+  }
+
+  def names(dataRaw: String): Option[String] = {
+    val response: Response = requests
+      .post("http://api.meaningcloud.com/topics-2.0",
+        data = Map("key" -> "6f1127894cf33dc0eedd757a01132d58",
+          "lang" -> "en",
+          "txt" -> dataRaw,
+          "tt" -> "e"),
+        headers = Map("content-type" -> "application/x-www-form-urlencoded"))
+    Thread.sleep(500)
+    if (response.statusCode == 200) {
+      Option(response.text)
+    } else
+      Option.empty
   }
 
 }
