@@ -3,8 +3,7 @@ import com.github.tototoshi.csv._
 import scalikejdbc._
 
 import java.io.File
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
+
 import play.api.libs.json._
 
 import java.nio.charset.StandardCharsets
@@ -26,7 +25,6 @@ object MainProyect extends App {
   val data: List[Map[String, String]] = reader.allWithHeaders()
   reader.close()
 
-  /*
   //Entidades
   case class Movies(id: Int,
                     index_movie: Int,
@@ -110,7 +108,7 @@ object MainProyect extends App {
     .map(x => (x("name").as[String], x("id").as[Int]))
     .toSet
 
-  val movies = companiesData.map(x =>
+  val companies = companiesData.map(x =>
     sql"""
     INSERT INTO production_companies(comp_id, comp_name)
     VALUES
@@ -144,7 +142,7 @@ object MainProyect extends App {
     .map(x => (x("iso_639_1").as[String], x("name").as[String]))
     .toSet
 
-  val spokenLanguage = spokenData.map(x =>
+  val spoken = spokenData.map(x =>
     sql"""
         INSERT INTO spoken_language(lang_iso_cod, lang_name)
         VALUES
@@ -179,7 +177,7 @@ object MainProyect extends App {
       row("credit_id").as[String],
       row("id").as[Int]))
 
-  val crews = crewData.map(x =>
+  val crew = crewData.map(x =>
     sql"""
           INSERT INTO crew(crew_name, gender, department, job, credit_id, personal_id)
           VALUES
@@ -190,7 +188,7 @@ object MainProyect extends App {
 
 
   val statusData = data.flatMap(elem => elem.get("status")).distinct
-  val crews = statusData.map(x =>
+  val statuss = statusData.map(x =>
     sql"""
             INSERT INTO status(status_name)
             VALUES
@@ -216,8 +214,7 @@ object MainProyect extends App {
       .update
       .apply())
 
-
-  val casData = data
+  val castData = data
     .map((row) => row("cast"))
     .filter(_.nonEmpty)
     .map(StringContext.processEscapes)
@@ -231,7 +228,7 @@ object MainProyect extends App {
     .distinct
     .toSet
 
-  val cast = casData.map(x =>
+  val cast = castData.map(x =>
     sql"""
          INSERT INTO `cast`(actor_name)
          VALUES
@@ -247,7 +244,7 @@ object MainProyect extends App {
     .flatMap(x => x._2.map((x._1, _)))
     .map(x => (x._1.toInt, x._2.toString().toInt))
 
-  val cast = movieCompanies.map(x =>
+  val movie_Companies = movieCompanies.map(x =>
     sql"""
            INSERT INTO movies_companies(id, comp_id)
            VALUES
@@ -257,13 +254,13 @@ object MainProyect extends App {
       .apply())
 
 
-  val movieCompanies = data
+  val movie_Countries = data
     .map(row => (row("id"), Json.parse(row("production_countries"))))
     .map(row => (row._1, (row._2 \\ "iso_3166_1").toList))
     .flatMap(x => x._2.map((x._1, _)))
     .map(x => (x._1.toInt, escapeMysql2(x._2.toString)))
 
-  val cast = movieCompanies.map(x =>
+  val movies_Countries = movieCompanies.map(x =>
     sql"""
              INSERT INTO movies_countries(id, prod_iso_cod)
              VALUES
@@ -278,7 +275,7 @@ object MainProyect extends App {
     .flatMap(x => x._2.map((x._1, _)))
     .map(x => (x._1.toInt, escapeMysql2(x._2.toString)))
 
-  val cast = movieLanguages.map(x =>
+  val movies_Languages = movieLanguages.map(x =>
     sql"""
                INSERT INTO movies_languages(id, lang_iso_cod)
                VALUES
@@ -291,7 +288,7 @@ object MainProyect extends App {
   val movieStatus = data
     .map(row => (row("id"), row("status")))
 
-  val cast = movieStatus.map(x =>
+  val movies_Status = movieStatus.map(x =>
     sql"""
     INSERT INTO movies_status(id, status_name)
     VALUES
@@ -314,7 +311,7 @@ object MainProyect extends App {
     .flatMap(x => x._2.map((x._1, _)))
     .map(x => (x._1.toInt, (escapeMysql2(x._2.toString))))
 
-  val crews = movieCrew.map(x =>
+  val movie_crews = movieCrew.map(x =>
     sql"""
       INSERT INTO movies_crew(id, credit_id)
       VALUES
@@ -331,7 +328,7 @@ object MainProyect extends App {
     .map(x => (x._1, x._2.split(" ").toList))
     .map(x => x._2.map((x._1, _)))
 
-  val genresInsert = movieGenres.map(_.map(x =>
+  val movie_genres = movieGenres.map(_.map(x =>
     sql"""
        INSERT INTO movies_genres(id, genre_name)
        VALUES
@@ -340,13 +337,11 @@ object MainProyect extends App {
       .update
       .apply()))
 
-   */
-
-  val casData = data
+  val moviesCast = data
     .map(row => (row("id"), row("cast")))
     .filter(_._2.nonEmpty)
     .map(x => (x._1, StringContext.processEscapes(x._2)))
-    .take(10) //Reestriccion
+    .take(5) //Reestriccion
     .map(x => (x._1, names(x._2)))
     .map(x => (x._1, Try(Json.parse(x._2.get))))
     .filter(_._2.isSuccess)
@@ -355,16 +350,17 @@ object MainProyect extends App {
     .map(x => (x._1, x._2.map(_("form"))))
     .map(x => (x._1.toInt, x._2.map(_.toString()).toList))
     .map(x => x._2.map((x._1, _)))
+    .flatMap(_.map(x => x._2))
+    .distinct
 
-
-  val moviesCastInsert = casData.map(_.map(x =>
+  val movie_cast = moviesCast.map(x =>
     sql"""
-       INSERT INTO movies_cast(id, actor_name)
+       INSERT INTO `cast`(actor_name)
        VALUES
-       (${x._1}, ${escapeMysql2(x._2)})
+       (${x})
        """.stripMargin
       .update
-      .apply()))
+      .apply())
 
 
   def escapeMysql2(text: String): String = text
