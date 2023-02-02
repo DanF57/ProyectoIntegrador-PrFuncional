@@ -388,24 +388,10 @@ object PoblarBaseDatos extends App {
   def replacePattern(original: String): String = {
     var txtOr = original
 
-    val pattern3: Regex = "(:\\s'\"(.*?)',)".r
-    for (m <- pattern3.findAllIn(original)) {
+    val pattern: Regex = "(:\\s'\"(.?)',)|([a-z]\\s\"(.?)\"\\s*[A-Z])|(\\s\"(.*?)\",)".r
+    for (m <- pattern.findAllIn(original)) {
       val textOriginal = m
-      val replacementText = m.replace("\"", "-u0022")
-      txtOr = txtOr.replace(textOriginal, replacementText)
-    }
-
-    val pattern2: Regex = "([a-z]\\s\"(.*?)\"\\s*[A-Z])".r
-    for (m <- pattern2.findAllIn(txtOr)) {
-      val textOriginal = m
-      val replacementText = m.replace("\"", "-u0022")
-      txtOr = txtOr.replace(textOriginal, replacementText)
-    }
-
-    val pattern1: Regex = "(\\s\"(.*?)\",)".r
-    for (m <- pattern1.findAllIn(txtOr)) {
-      val textOriginal = m
-      val replacementText = m.replace("'", "-u0027")
+      val replacementText = m.replace("\"", "-u0022").replace("'", "-u0027")
       txtOr = txtOr.replace(textOriginal, replacementText)
     }
     txtOr
