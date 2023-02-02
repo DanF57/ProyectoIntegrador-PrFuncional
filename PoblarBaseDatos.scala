@@ -22,11 +22,34 @@ object PoblarBaseDatos extends App {
   val data: List[Map[String, String]] = reader.allWithHeaders()
   reader.close()
 
+  //-------------Tabla Directores-------------
+  val directorData = data.flatMap(elem => elem.get("director")).distinct
+  val directors = directorData.map(x =>
+    sql"""
+      INSERT INTO director(director_name)
+      VALUES
+      (${StringContext.processEscapes(x)})
+    """.stripMargin
+      .update
+      .apply())
+
+  //-------------Tabla Status-------------
+  val statusData = data.flatMap(elem => elem.get("status")).distinct
+  val statuss = statusData.map(x =>
+    sql"""
+      INSERT INTO status(status_name)
+      VALUES
+      (${x})
+    """.stripMargin
+      .update
+      .apply())
+
   //-----------------------------------------------------Entidades-----------------------------------------------------
   //-------------Tabla Movies-------------
   case class Movies(id: Int,
                     index_movie: Int,
                     budget: Long,
+                    director: String,
                     ori_title: String,
                     title: String,
                     ori_language: String,
@@ -34,6 +57,7 @@ object PoblarBaseDatos extends App {
                     homepage: String,
                     overview: String,
                     popularity: Double,
+                    status_name: String,
                     release_date: String,
                     revenue: Long,
                     runtime: Double,
@@ -53,6 +77,7 @@ object PoblarBaseDatos extends App {
         case valueOfRT if valueOfRT.trim.isEmpty => 0
         case valueOfRT => valueOfRT.toLong
       },
+      StringContext.processEscapes(row("director")),
       escapeMysql(row("original_title")),
       row("title"),
       row("original_language"),
@@ -63,6 +88,7 @@ object PoblarBaseDatos extends App {
         case valueOfRT if valueOfRT.trim.isEmpty => 0.0
         case valueOfRT => valueOfRT.toDouble
       },
+      row("status"),
       row("release_date") match {
         case valueOfRT if valueOfRT.trim.isEmpty => null
         case valueOfRT => valueOfRT
@@ -87,23 +113,12 @@ object PoblarBaseDatos extends App {
 
   val movies = movieData.map(x =>
     sql"""
-      INSERT INTO movies(id, index_movie, budget, ori_title, title, ori_language, keywords, homepage,
-      overview, popularity, release_date, revenue, runtime, tagline, vote_average, vote_count)
+      INSERT INTO movies(id, index_movie, budget, director_name, ori_title, title, ori_language, keywords, homepage,
+      overview, popularity, status_name, release_date, revenue, runtime, tagline, vote_average, vote_count)
       VALUES
-      (${x.id}, ${x.index_movie}, ${x.budget}, ${x.ori_title}, ${x.title}, ${x.ori_language}, ${x.keywords},
-      ${x.homepage}, ${x.overview}, ${x.popularity}, ${x.release_date}, ${x.revenue}, ${x.runtime}, ${x.tagline},
-      ${x.vote_average}, ${x.vote_count})
-    """.stripMargin
-      .update
-      .apply())
-
-  //-------------Tabla Directores-------------
-  val directorData = data.flatMap(elem => elem.get("director")).distinct
-  val directors = directorData.map(x =>
-    sql"""
-      INSERT INTO director(director_name)
-      VALUES
-      (${StringContext.processEscapes(x)})
+      (${x.id}, ${x.index_movie}, ${x.budget}, ${x.director},${x.ori_title}, ${x.title}, ${x.ori_language}, ${x.keywords},
+      ${x.homepage}, ${x.overview}, ${x.popularity}, ${x.status_name},${x.release_date}, ${x.revenue},
+      ${x.runtime}, ${x.tagline}, ${x.vote_average}, ${x.vote_count})
     """.stripMargin
       .update
       .apply())
@@ -171,6 +186,7 @@ object PoblarBaseDatos extends App {
 
   val crewData = data
     .flatMap(row => row.get("crew"))
+    .filter(_.nonEmpty)
     .map(replacePattern)
     .map(text => text.replace("'", "\""))
     .map(text => text.replace("-u0027", "'"))
@@ -196,17 +212,6 @@ object PoblarBaseDatos extends App {
       .update
       .apply())
 
-  //-------------Tabla Status-------------
-  val statusData = data.flatMap(elem => elem.get("status")).distinct
-  val statuss = statusData.map(x =>
-    sql"""
-      INSERT INTO status(status_name)
-      VALUES
-      (${x})
-    """.stripMargin
-      .update
-      .apply())
-
   //-------------Tabla Genres-------------
   val genresData = data
     .flatMap(elem => elem.get("genres"))
@@ -228,6 +233,7 @@ object PoblarBaseDatos extends App {
   val castData = data
     .map((row) => row("cast"))
     .filter(_.nonEmpty)
+    .take(100)
     .map(StringContext.processEscapes)
     .map(names)
     .map(json => Try(Json.parse(json.get)))
@@ -249,19 +255,6 @@ object PoblarBaseDatos extends App {
       .apply())
 
   //-----------------------------------------------------Relaciones-----------------------------------------------------
-  //-------------Tabla Movie_Director-------------
-  val movieDirector = data
-    .map(row => (row("id"), row("director")))
-
-  val movie_Director = movieDirector.map(x =>
-    sql"""
-   INSERT INTO movies_director(id, director)
-   VALUES
-   (${x._1}, ${x._2})
-   """.stripMargin
-      .update
-      .apply())
-
   //-------------Tabla Movie_Companies-------------
   val movieCompanies = data
     .map(row => (row("id"), Json.parse(row("production_companies"))))
@@ -279,13 +272,13 @@ object PoblarBaseDatos extends App {
       .apply())
 
   //-------------Tabla Movie_Countires------------
-  val movie_Countries = data
+  val movieCountries = data
     .map(row => (row("id"), Json.parse(row("production_countries"))))
     .map(row => (row._1, (row._2 \\ "iso_3166_1").toList))
     .flatMap(x => x._2.map((x._1, _)))
     .map(x => (x._1.toInt, escapeMysql2(x._2.toString)))
 
-  val movies_Countries = movieCompanies.map(x =>
+  val movies_Countries = movieCountries.map(x =>
     sql"""
              INSERT INTO movies_countries(id, prod_iso_cod)
              VALUES
@@ -310,22 +303,10 @@ object PoblarBaseDatos extends App {
       .update
       .apply())
 
-  //-------------Tabla Movie_Status------------
-  val movieStatus = data
-    .map(row => (row("id"), row("status")))
-
-  val movies_Status = movieStatus.map(x =>
-    sql"""
-    INSERT INTO movies_status(id, status_name)
-    VALUES
-    (${x._1}, ${x._2})
-    """.stripMargin
-      .update
-      .apply())
-
   //-------------Tabla Movie_Crew------------
   val movieCrew = data
-    .map(row => (row("id"), (row("crew"))))
+    .map(row => (row("id"), row("crew")))
+    .filter(_._2.nonEmpty)
     .map(x => (x._1, replacePattern(x._2)))
     .map(x => (x._1, x._2.replace("'", "\"")))
     .map(x => (x._1, x._2.replace("-u0027", "'")))
@@ -369,7 +350,7 @@ object PoblarBaseDatos extends App {
     .map(row => (row("id"), row("cast")))
     .filter(_._2.nonEmpty)
     .map(x => (x._1, StringContext.processEscapes(x._2)))
-    .take(5) //Reestriccion
+    .take(100) //Reestriccion
     .map(x => (x._1, names(x._2)))
     .map(x => (x._1, Try(Json.parse(x._2.get))))
     .filter(_._2.isSuccess)
@@ -387,7 +368,7 @@ object PoblarBaseDatos extends App {
      """.stripMargin
       .update
       .apply()))
-  
+
 
   //-------------------------------------------Funciones de Limpieza----------------------------------------------
   def escapeMysql2(text: String): String = text
