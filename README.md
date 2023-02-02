@@ -1,6 +1,7 @@
 # ProyectoIntegrador-PrFuncional
 Integrantes: Daniel Flores, Cristian Rodríguez, Jean Panamito
 
+Dependencias necesarias para el build 
 ```scala
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
