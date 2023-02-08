@@ -1,3 +1,4 @@
+
 import com.github.tototoshi.csv._
 
 import java.util.Locale
@@ -5,132 +6,151 @@ import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import com.cibo.evilplot.plot._
+import com.cibo.evilplot.plot.aesthetics.DefaultTheme._
+import com.cibo.evilplot.plot.renderers.BarRenderer
 import com.cibo.evilplot.colors.RGB
 import com.cibo.evilplot.geometry.{Align, Drawable, Extent, Rect, Text}
-import com.cibo.evilplot.plot.aesthetics.DefaultTheme._
-import com.cibo.evilplot.plot.{Bar, BarChart}
-import com.cibo.evilplot.plot.renderers.BarRenderer
-import requests.RequestAuth.Empty
+import com.cibo.evilplot.plot.aesthetics.DefaultTheme.{DefaultFonts, DefaultTheme}
+
+import java.util
+
 
 object DatosNumericos extends App{
+
+  //LECTURA CSV
   val reader = CSVReader.open(new File("C:\\Users\\Daniel\\Downloads/movie_dataset.csv"))
   val data: List[Map[String, String]] = reader.allWithHeaders()
   reader.close()
 
-  val release_date = data.flatMap(elem => elem.get("release_date"))
-  val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-  val releaseDateList = data
-    .map(row => row("release_date"))
-    .filter(!_.equals(""))
-    .map(text => LocalDate.parse(text, dateFormatter))
-  val yearReleaseList = releaseDateList
-    .map(_.getYear)
-
-
-  //Columnas Numéricas
-  val presupuestos = numericColumn("budget")
-  val popularity = numericColumn("popularity")
-  val revenue = numericColumn("revenue")
-  val runtime = numericColumn("runtime")
-  val vote_average = numericColumn("vote_average")
-  val vote_count = numericColumn("vote_count")
-
-    //Maximo Minimo Promedio
-    val presupuestoMmP = estadisticasBasicas(presupuestos)
-    val popularityMmP = estadisticasBasicas(popularity)
-    val revenueMmP = estadisticasBasicas(revenue)
-    val runtimeMmP = estadisticasBasicas(runtime)
-    val vote_averageMmP = estadisticasBasicas(vote_average)
-    val vote_countMmP = estadisticasBasicas(vote_count)
-    val years = estadisticasBasicas(yearReleaseList.map(_.toDouble))
-
-  def numericColumn(columna: String): List[Double] ={
-    data.flatMap(elem => elem.get(columna)).filter(_.nonEmpty).map(_.toDouble)
-  }
-
-  def estadisticasBasicas(columna: List[Double]) : Seq[Double] ={
-    //Max
-    val maximo = columna.max
-    //Min sin 0s
-    val minimo = columna.filter(_ > 0).filter(_ > 1).min
-    //Promedio sin 0s
-    val promedio = average(columna.filter(_ > 0))
-
-    Seq[Double](minimo, maximo, promedio)
-  }
-
-  def average(valores: List[Double]): Double = {
+  //FUNCIONES
+  def average(valores: List[Long]): Double = {
     val t = valores.foldLeft((0.0, 0))((acc, currVal) => (acc._1 + currVal, acc._2 + 1))
     t._1 / t._2
   }
 
-  //Graficas
+  def averageDouble(valores: List[Double]): Double = {
+    val t = valores.foldLeft((0.0, 0))((acc, currVal) => (acc._1 + currVal, acc._2 + 1))
+    t._1 / t._2
+  }
+
+  //Columnas Numéricas
+  //Presupuestos
+    //4803 valores
+    //1037 ceros
+  val presupuestos = data.flatMap(row => row.get("budget"))
+    .map(_.toLong)
+    //.count(_ == 0)
+
+  //Popularity
+    //4803 valores
+    //1 ceros
+  val popularity = data.flatMap(row => row.get("popularity"))
+    .map(_.toDouble)
+    //.count(_ == 0.0)
+
+  //Release_date
+    //4802 valores
+    //1 vacios
+  val release_date = data.flatMap(elem => elem.get("release_date"))
+  val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
+  val releaseDateList = release_date
+    .filter(!_.equals(""))
+    .map(text => LocalDate.parse(text, dateFormatter))
+
+  //Revenue
+    //1427 ceros
+  val revenue = data.flatMap(row => row.get("revenue"))
+    .map(_.toLong)
+    //.count(_ == 0)
+
+  //Runtime
+    //2 vacios
+    //1427 ceros
+  val runtime = data.flatMap(row => row.get("runtime"))
+    .filter(!_.equals(""))
+    .map(_.toDouble)
+
+  //Vote_average
+    //63 ceros
+  val voteAverage = data.flatMap(row => row.get("vote_average"))
+    .map(_.toDouble)
+    //.count(_ == 0.0)
+
+  //Vote_count
+    //63 ceros
+  val voteCount = data.flatMap(row => row.get("vote_count"))
+    .map(_.toDouble)
+    //.count(_ == 0.0)
+
+  //------------------------PROMEDIOS-------------------------------
+  val budgetAvg = average(presupuestos)
+  val revenueAvg = average(revenue)
+
+  //------------------------GRAFICAS--------------------------------
+  //-----------REVENUE-----------
+  val cerosRevenue = data.flatMap(row => row.get("revenue"))
+    .map(_.toLong)
+    .count(_ == 0)
+    .toDouble
+
+  val underAvgRevenue = revenue.count(_ < revenueAvg)
+  val aboveAvgRevenue = revenue.count(_ > revenueAvg)
+
+  PieChart(Seq("Ceros" -> cerosRevenue, "Bajo el Promedio" -> underAvgRevenue, "Encima del Promedio" -> aboveAvgRevenue))
+    .rightLegend()
+    .title("Revenue")
+    .render()
+    .write(new File
+    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\New/Revenue.jpg"))
+
+  //-----------BUDGET-----------
+  val presupuestosAvg = average(presupuestos)
+
   val labeledByColor = new BarRenderer {
+    val positive = RGB(0, 204, 204)
+    val negative = RGB(0, 204, 204)
+
     def render(plot: Plot, extent: Extent, category: Bar): Drawable = {
       val rect = Rect(extent)
       val value = category.values.head
-      val color = RGB(0, 204, 204)
-      Align.center(rect filled color, Text(s"$value", size = 10)
+      val color = if (value >= presupuestosAvg) positive else negative
+      Align.center(rect filled color, Text(s"$value%", size = 20)
       ).group
     }
   }
 
-  val labelsvA = Seq("Minimo", "Maximo", "Promedio")
+  val underAvgPres = "%.2f".format((presupuestos.count(_ < presupuestosAvg)/4803.0) * 100)
+    .replace(",", ".").toDouble
+  val aboveAvgPres = "%.2f".format((presupuestos.count(_ > presupuestosAvg)/4803.0) * 100)
+    .replace(",", ".").toDouble
+  val cerosPres = "%.2f".format((presupuestos.count(_ == 0)/4803.0) * 100)
+    .replace(",", ".").toDouble
 
+
+  val percentChange = Seq[Double](underAvgPres, aboveAvgPres, cerosPres)
+  val labels = Seq("Menor", "Mayor", "Cero")
   BarChart
-    .custom(presupuestoMmP.map(Bar.apply), spacing = Some(20), barRenderer = Some(labeledByColor))
-    .title("Presupuestos MmP")
-    .standard(xLabels = labelsvA)
+    .custom(percentChange.map(Bar.apply), spacing = Some(20),
+      barRenderer = Some(labeledByColor)
+    )
+    .standard(xLabels = labels)
+    .title("Porcentaje Presupuestos comparados al Promedio")
     .render()
     .write(new File
-    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\Practicum\\Gráficas\\Datos Tipo Numérico/Presupuestos.png"))
+    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\New/Budgets.jpg"))
 
-  BarChart
-    .custom(popularityMmP.map(Bar.apply), spacing = Some(20), barRenderer = Some(labeledByColor))
-    .title("Popularity MmP")
-    .standard(xLabels = labelsvA)
+  //-----------RELEASE_DATE-----------
+  val yearReleaseList = releaseDateList
+    .map(_.getYear)
+    .map(_.toDouble)
+
+  Histogram(yearReleaseList)
+    .title("Histograma Años de Lanzamiento")
+    .xAxis()
+    .yAxis()
+    .xbounds(1916.0, 2018.0)
     .render()
-    .write(new File
-    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\Practicum\\Gráficas\\Datos Tipo Numérico/Popularity.png"))
+    .write(new File("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\New/HistoYear.jpg"))
 
-  BarChart
-    .custom(revenueMmP.map(Bar.apply), spacing = Some(20), barRenderer = Some(labeledByColor))
-    .title("Revenue MmP")
-    .standard(xLabels = labelsvA)
-    .render()
-    .write(new File
-    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\Practicum\\Gráficas\\Datos Tipo Numérico/Revenue.png"))
-
-  BarChart
-    .custom(runtimeMmP.map(Bar.apply), spacing = Some(20), barRenderer = Some(labeledByColor))
-    .title("Runtime MmP")
-    .standard(xLabels = labelsvA)
-    .render()
-    .write(new File
-    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\Practicum\\Gráficas\\Datos Tipo Numérico/Runtime.png"))
-
-  BarChart
-    .custom(vote_averageMmP.map(Bar.apply), spacing = Some(20), barRenderer = Some(labeledByColor))
-    .title("VoteAvg MmP")
-    .standard(xLabels = labelsvA)
-    .render()
-    .write(new File
-    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\Practicum\\Gráficas\\Datos Tipo Numérico/VoteAvg.png"))
-
-  BarChart
-    .custom(vote_countMmP.map(Bar.apply), spacing = Some(20), barRenderer = Some(labeledByColor))
-    .title("VoteCount MmP")
-    .standard(xLabels = labelsvA)
-    .render()
-    .write(new File
-    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\Practicum\\Gráficas\\Datos Tipo Numérico/VoteCount.png"))
-
-  BarChart
-    .custom(years.map(Bar.apply), spacing = Some(20), barRenderer = Some(labeledByColor))
-    .title("Años MmP")
-    .standard(xLabels = labelsvA)
-    .render()
-    .write(new File
-    ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\Practicum\\Gráficas\\Datos Tipo Numérico/Years.png"))
-
+  //
 }
