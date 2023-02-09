@@ -1,7 +1,6 @@
 
 import com.github.tototoshi.csv._
 
-import java.util.Locale
 import java.io.File
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -12,7 +11,7 @@ import com.cibo.evilplot.colors.RGB
 import com.cibo.evilplot.geometry.{Align, Drawable, Extent, Rect, Text}
 import com.cibo.evilplot.plot.aesthetics.DefaultTheme.{DefaultFonts, DefaultTheme}
 
-import java.util
+import scala.math.BigDecimal.RoundingMode
 
 
 object DatosNumericos extends App{
@@ -33,11 +32,11 @@ object DatosNumericos extends App{
     t._1 / t._2
   }
 
-  //Columnas Numéricas
+  //-----------------------------------------------Columnas Numéricas-------------------------------------------------
   //Presupuestos
     //4803 valores
     //1037 ceros
-  val presupuestos = data.flatMap(row => row.get("budget"))
+  val budget = data.flatMap(row => row.get("budget"))
     .map(_.toLong)
     //.count(_ == 0)
 
@@ -45,7 +44,7 @@ object DatosNumericos extends App{
     //4803 valores
     //1 ceros
   val popularity = data.flatMap(row => row.get("popularity"))
-    .map(_.toDouble)
+      .map(_.toDouble)
     //.count(_ == 0.0)
 
   //Release_date
@@ -54,39 +53,43 @@ object DatosNumericos extends App{
   val release_date = data.flatMap(elem => elem.get("release_date"))
   val dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
   val releaseDateList = release_date
-    .filter(!_.equals(""))
+    .filter(_.nonEmpty)
     .map(text => LocalDate.parse(text, dateFormatter))
 
   //Revenue
     //1427 ceros
   val revenue = data.flatMap(row => row.get("revenue"))
-    .map(_.toLong)
+     .map(_.toLong)
     //.count(_ == 0)
 
   //Runtime
     //2 vacios
     //1427 ceros
   val runtime = data.flatMap(row => row.get("runtime"))
-    .filter(!_.equals(""))
+    .filter(_.nonEmpty)
     .map(_.toDouble)
 
   //Vote_average
     //63 ceros
   val voteAverage = data.flatMap(row => row.get("vote_average"))
-    .map(_.toDouble)
+      .map(_.toDouble)
     //.count(_ == 0.0)
 
   //Vote_count
     //63 ceros
   val voteCount = data.flatMap(row => row.get("vote_count"))
-    .map(_.toDouble)
+      .map(_.toDouble)
     //.count(_ == 0.0)
 
   //------------------------PROMEDIOS-------------------------------
-  val budgetAvg = average(presupuestos)
+  val budgetAvg = average(budget)
   val revenueAvg = average(revenue)
+  val popularityAvg = averageDouble(popularity)
+  val runtimeAvg = averageDouble(runtime)
+  val voteAverageAvg = averageDouble(voteAverage)
+  val voteCountAvg = averageDouble(voteCount)
 
-  //------------------------GRAFICAS--------------------------------
+  //-------------------------------------------GRAFICAS-------------------------------------------------------------
   //-----------REVENUE-----------
   val cerosRevenue = data.flatMap(row => row.get("revenue"))
     .map(_.toLong)
@@ -104,27 +107,21 @@ object DatosNumericos extends App{
     ("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\New/Revenue.jpg"))
 
   //-----------BUDGET-----------
-  val presupuestosAvg = average(presupuestos)
-
-  val labeledByColor = new BarRenderer {
-    val positive = RGB(0, 204, 204)
-    val negative = RGB(0, 204, 204)
-
+  val labeledByColor = new BarRenderer { //Renderizado Personalizado
     def render(plot: Plot, extent: Extent, category: Bar): Drawable = {
       val rect = Rect(extent)
       val value = category.values.head
-      val color = if (value >= presupuestosAvg) positive else negative
-      Align.center(rect filled color, Text(s"$value%", size = 20)
+      val color =  RGB(0, 204, 204)
+      Align.center(rect filled color, Text(s"$value%", size = 16)
       ).group
     }
   }
-
-  val underAvgPres = "%.2f".format((presupuestos.count(_ < presupuestosAvg)/4803.0) * 100)
-    .replace(",", ".").toDouble
-  val aboveAvgPres = "%.2f".format((presupuestos.count(_ > presupuestosAvg)/4803.0) * 100)
-    .replace(",", ".").toDouble
-  val cerosPres = "%.2f".format((presupuestos.count(_ == 0)/4803.0) * 100)
-    .replace(",", ".").toDouble
+  val underAvgPres = BigDecimal((budget.count(_ < budgetAvg) / budget.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val aboveAvgPres = BigDecimal((budget.count(_ > budgetAvg) / budget.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val cerosPres = BigDecimal((budget.count(_ ==0) / budget.length.toDouble) * 100  )
+    .setScale(2, RoundingMode.HALF_UP).toDouble
 
 
   val percentChange = Seq[Double](underAvgPres, aboveAvgPres, cerosPres)
@@ -146,11 +143,79 @@ object DatosNumericos extends App{
 
   Histogram(yearReleaseList)
     .title("Histograma Años de Lanzamiento")
+    .frame()
     .xAxis()
     .yAxis()
     .xbounds(1916.0, 2018.0)
     .render()
     .write(new File("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\New/HistoYear.jpg"))
 
-  //
+  //BOXPLOT
+  /*
+  val seqBudget = Seq[Double](presupuestos.filter(_ > 0).min.toDouble, budgetAvg, presupuestos.max.toDouble)
+  val seqRevenue = Seq[Double](revenue.filter(_ > 0).min.toDouble, revenueAvg, revenue.max.toDouble)
+
+  val seqPopularity = Seq[Double](popularity.filter(_ > 0).min, popularityAvg, popularity.max)
+  val seqVoteCount= Seq[Double](voteCount.filter(_ > 0).min, voteCountAvg, voteCount.max)
+
+  val seqRuntime = Seq[Double](runtime.filter(_ > 0).min, runtimeAvg, runtime.max)
+  val seqVoteAverage = Seq[Double](voteAverage.filter(_ > 0).min, voteAverageAvg, voteAverage.max)
+
+  val underAvgPres = BigDecimal((budget.count(_ < budgetAvg) / budget.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val aboveAvgPres = BigDecimal((budget.count(_ > budgetAvg) / budget.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val cerosPres = BigDecimal((budget.count(_ ==0) / budget.length.toDouble) * 100  )
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+
+  val underAvgRev = BigDecimal((revenue.count(_ < revenueAvg) / revenue.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val aboveAvgRev= BigDecimal((revenue.count(_ > revenueAvg) / revenue.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val cerosRev = BigDecimal((revenue.count(_ == 0) / revenue.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+
+  val underAvgVc = BigDecimal((voteCount.count(_ < voteCountAvg) / voteCount.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val aboveAvgVc = BigDecimal((voteCount.count(_ > voteCountAvg) / voteCount.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val cerosVc = BigDecimal((voteCount.count(_ == 0) / voteCount.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+
+  val underAvgPop = BigDecimal((popularity.count(_ < popularityAvg) / popularity.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val aboveAvgPop = BigDecimal((popularity.count(_ > popularityAvg) / popularity.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val cerosPop = BigDecimal((popularity.count(_ == 0) / popularity.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+
+  val underAvgRun = BigDecimal((runtime.count(_ < runtimeAvg) / runtime.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val aboveAvgRun = BigDecimal((runtime.count(_ > runtimeAvg) / runtime.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val cerosRun = BigDecimal((runtime.count(_ == 0) / runtime.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+
+  val underAvgVA = BigDecimal((voteAverage.count(_ < voteAverageAvg) / voteAverage.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val aboveAvgVA = BigDecimal((voteAverage.count(_ > voteAverageAvg) / voteAverage.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+  val cerosVA = BigDecimal((voteAverage.count(_ == 0) / voteAverage.length.toDouble) * 100)
+    .setScale(2, RoundingMode.HALF_UP).toDouble
+
+  val seqBudget = Seq[Double](cerosPres, underAvgPres, aboveAvgPres)
+  val seqRevenue = Seq[Double](cerosRev, underAvgRev, aboveAvgRev)
+  val seqVc = Seq[Double](cerosVc, underAvgVc, aboveAvgVc)
+  val seqPopular = Seq[Double](cerosPop, underAvgPop, aboveAvgPop)
+  val seqRuntime = Seq[Double](cerosRun, underAvgRun, aboveAvgRun)
+  val seqVa= Seq[Double](cerosVA, underAvgVA, aboveAvgVA)
+
+  val prueba = Seq[Seq[Double]](seqBudget, seqRevenue, seqVc, seqPopular, seqRuntime, seqVa)
+  BoxPlot(prueba)
+    .title("BoxPlot")
+    .standard(xLabels = Seq[String]("Budget", "Revenue", "Vote_Count", "Popularity", "Runtime", "Vote_Average"))
+    .render()
+    .write(new File("C:\\Users\\Daniel\\Utpl\\3ER CICLO\\New/pruebaBoxPlot.png"))
+   */
+
 }
